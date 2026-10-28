@@ -1,0 +1,91 @@
+rules_version = '2';
+
+// Permisos por rol (Security Rules).
+// admin = administración · logistica = logística y compras · cocina = producción · pendiente = cuenta nueva sin rol.
+// Todo exige correo verificado.
+// Los libros (movimientos, compras, producciones, pagos…) solo se agregan: nadie los edita ni borra.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Sesión iniciada y correo verificado: sin verificar no se lee ni se escribe nada.
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function role() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? profile().role : 'none';
+    }
+    function isAdmin() { return role() == 'admin'; }
+    function isLog() { return role() == 'logistica'; }
+    function isCook() { return role() == 'cocina'; }
+    function staff() { return isAdmin() || isLog() || isCook(); }
+    function money() { return isAdmin() || isLog(); }
+    function stamped() { return request.resource.data.createdBy == request.auth.uid; }
+    function onlyKeys(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    // ---------- Usuarios ----------
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || money());
+      // Cuenta nueva: se crea a sí misma sin rol; la administración se lo asigna.
+      allow create: if signedIn() && request.auth.uid == uid && request.resource.data.role == 'pendiente';
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == uid && onlyKeys(['language', 'clearVision', 'name']));
+    }
+
+    // ---------- Catálogos: todos leen, la administración edita ----------
+    match /{col}/{id} {
+      allow read: if staff() && col in ['ingredients', 'suppliers', 'products', 'recipes',
+        'supplier_ingredient_variants', 'clients_channels', 'equipment', 'cooking_profiles',
+        'settings', 'commission_rates', 'production_orders'];
+      allow write: if isAdmin() && col in ['ingredients', 'suppliers', 'products', 'recipes',
+        'supplier_ingredient_variants', 'clients_channels', 'equipment', 'cooking_profiles', 'settings'];
+    }
+    // Logística aprende conversiones reales al contar en una compra (1 kg de tomate = 7 tomates).
+    match /ingredients/{id} {
+      allow update: if isLog() && onlyKeys(['conversions', 'conversionSource']);
+    }
+    // Logística define el pago por hamburguesa y hace la comanda.
+    match /commission_rates/{id} { allow create: if money(); allow update: if isAdmin(); }
+    match /production_orders/{id} { allow create, update: if money(); }
+
+    // ---------- Solo dinero (admin y logística) ----------
+    match /custom_prices/{id} { allow read: if money(); allow write: if isAdmin(); }
+    match /funds/{id} { allow read: if money(); allow write: if isAdmin(); }
+    match /utility_rates/{id} { allow read: if money(); allow write: if isAdmin(); }
+    match /overhead_expenses/{id} { allow read: if money(); allow create: if isAdmin() && stamped(); }
+
+    // ---------- Libros: solo se agregan ----------
+    match /inventory_movements/{id} { allow read: if money(); allow create: if staff() && stamped(); }
+    match /purchases/{id} { allow read: if money(); allow create: if money() && stamped(); }
+    match /productions/{id} {
+      allow read: if money() || (isCook() && resource.data.cookId == request.auth.uid);
+      allow create: if staff() && stamped();
+      // Solo para marcar la liquidación.
+      allow update: if money() && onlyKeys(['settlementId', 'settled']);
+    }
+    match /finished_goods_movements/{id} { allow read: if staff(); allow create: if staff() && stamped(); }
+    match /dispatches/{id} {
+      allow read: if money();
+      allow create: if money() && stamped();
+      allow update: if money() && onlyKeys(['paid', 'status', 'paymentId', 'posSessionId']);
+    }
+    match /payments/{id} { allow read: if money(); allow create: if money() && stamped(); }
+    match /pos_sessions/{id} { allow read: if money(); allow create: if money() && stamped(); }
+    match /cash_movements/{id} { allow read: if isAdmin(); allow create: if money() && stamped(); }
+    match /payroll_settlements/{id} {
+      allow read: if money() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if money() && stamped();
+    }
+    // Mermas: nota obligatoria de al menos 10 caracteres (RNF-04), aunque se salten la pantalla.
+    match /waste_logs/{id} {
+      allow read: if staff();
+      allow create: if staff() && stamped()
+        && request.resource.data.note is string
+        && request.resource.data.note.trim().size() >= 10;
+    }
+
+    // ---------- Saldos resumen (se actualizan con incrementos) ----------
+    match /stock/{id} { allow read, create, update: if staff(); }
+    match /finished_stock/{id} { allow read, create, update: if staff(); }
+    match /finished_lots/{id} { allow read, create, update: if staff(); }
+    match /fund_balances/{id} { allow read: if isAdmin(); allow create, update: if money(); }
+  }
+}
