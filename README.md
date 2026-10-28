@@ -77,23 +77,12 @@ La pantalla de Inicio lista lo pendiente. Los datos iniciales traen:
 
 ## Cómo está hecha
 
-```
-src/
-  domain/      lógica pura y probada: unidades, receta (BOM), faltantes, fondos, costos, PEPS, cuadre
-  data/
-    backend.js         interfaz única de datos (Firestore o demo)
-    firebaseAdapter.js Firestore con caché offline + Auth
-    memoryAdapter.js   modo demo
-    ops.js             cada operación = un lote atómico (todo o nada), sin lecturas → sirve sin señal
-    store.jsx          suscripciones en vivo y catálogos compartidos
-    costs.js           modelo de costo completo y margen
-    seed.js            datos iniciales
-  screens/     admin · logistica · cocina · common
-firestore.rules  permisos por rol; correo verificado obligatorio; libros que solo se agregan; nota obligatoria en mermas
-test/            pruebas (npm test)
-```
+Todos los archivos están en la raíz, sin carpetas, para poder subirlos a GitHub arrastrándolos de una vez.
 
-Diferencias con el documento de modelo de datos, propias de Firestore: las líneas de receta (`recipe_ingredients`), de compra (`purchase_items`) y las conversiones por insumo viven dentro de su documento padre; y hay documentos resumen (`stock`, `finished_stock`, `finished_lots`, `fund_balances`) que se actualizan con incrementos para ver saldos al instante.
+- Lógica pura y probada: `units.js`, `recipe.js`, `shopping.js`, `funds.js`, `costing.js`, `production.js`, `dates.js`
+- Datos: `backend.js` (interfaz única), `firebaseAdapter.js` (Firestore con caché offline + Auth), `memoryAdapter.js` (modo demo), `ops.js` (cada operación es un lote atómico), `store.jsx`, `costs.js`, `seed.js`
+- Pantallas: `App.jsx` y un archivo por pantalla (`Produce.jsx`, `Order.jsx`, `Costs.jsx`…)
+- `firestore.rules`: permisos por rol, correo verificado obligatorio, libros que solo se agregan, nota obligatoria en mermas
 
 ## Pruebas
 

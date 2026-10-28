@@ -1,13 +1,25 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync, existsSync } from 'node:fs';
+
+// Todos los archivos viven en la raíz (sin carpetas), así que los íconos
+// se copian a dist desde aquí en lugar de usar la carpeta public.
+const ICONS = ['icon.svg', 'icon-192.png', 'icon-512.png'];
+const copyIcons = () => ({
+  name: 'copiar-iconos',
+  generateBundle() {
+    for (const f of ICONS) if (existsSync(f)) this.emitFile({ type: 'asset', fileName: f, source: readFileSync(f) });
+  }
+});
 
 export default defineConfig({
+  publicDir: false,
   plugins: [
     react(),
+    copyIcons(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'Mountain Burger · Cali Grill',
         short_name: 'Mountain Burger',
