@@ -216,7 +216,7 @@ function Users() {
   const cat = useCatalog();
   return (
     <>
-      <Notice>{L('Cada persona crea su cuenta desde la pantalla de entrada; aquí le asignas el rol.', 'People sign up; assign roles here.')}</Notice>
+      <Notice>{L('Cada persona crea su cuenta, verifica su correo y entra una vez a la app; ahí aparece en esta lista y le asignas el rol. Si alguien no aparece, todavía no ha verificado su correo o no ha vuelto a entrar.', 'People sign up and verify their email; then they show up here.')}</Notice>
       <EntityEditor col="users" title={L('Usuarios', 'Users')} items={cat.users} noAdd
         fields={[
           { key: 'name', label: L('Nombre', 'Name'), required: true },

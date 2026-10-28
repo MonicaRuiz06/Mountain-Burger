@@ -70,7 +70,13 @@ function WithProfile({ user }) {
   useEffect(() => {
     // Primer ingreso: se crea el perfil sin rol; la administración lo asigna.
     if (profile === null) {
-      be().commit([{ type: 'set', col: 'users', id: user.uid, data: { email: user.email, name: user.email.split('@')[0], role: 'pendiente', language: 'es', clearVision: false, active: true, createdAt: new Date().toISOString() } }]).catch(() => {});
+      const data = { email: user.email, name: user.email.split('@')[0], role: 'pendiente', language: 'es', clearVision: false, active: true, createdAt: new Date().toISOString() };
+      const create = () => be().commit([{ type: 'set', col: 'users', id: user.uid, data }]);
+      // Si la sesión venía de antes de verificar el correo, el permiso todavía dice "sin verificar":
+      // se renueva la sesión y se intenta otra vez.
+      create().catch(async () => {
+        try { await be().auth.reload(); await create(); } catch (e) { console.error('No se pudo crear el perfil', e); }
+      });
     }
   }, [profile, user]);
   useEffect(() => {
